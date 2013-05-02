@@ -32,6 +32,16 @@ func blobHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Read up to 512 first bytes in order to detect the mime type
+	buff := make([]byte, 512)
+	n, err := blobFileReader.Read(buff)
+	buff = buff[:n]
+
+	contentType := http.DetectContentType(buff)
+	w.Header().Add("Content-type", contentType)
+
+	w.Write(buff)
+
 	io.Copy(w, blobFileReader)
 }
 
@@ -40,7 +50,7 @@ func initStorage() bool {
 	var storagePath string
 	flag.StringVar(&storagePath, "storage", "", "Storage path")
 	flag.StringVar(&storagePath, "s", "", "Storage path")
-	
+
 	flag.Parse()
 
 	if storagePath == "" {
