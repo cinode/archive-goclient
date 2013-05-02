@@ -1,6 +1,8 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"github.com/cinode/golib/blobstore"
 	"io"
 	"net/http"
@@ -8,8 +10,7 @@ import (
 )
 
 var blobUrlRegex = regexp.MustCompile(`^/blob/([0-9A-Fa-f]+)/([0-9A-Fa-f]+)$`)
-var blobStorage = blobstore.NewFileBlobStorage("../../../storage")
-var blobFileReder = blobstore.FileBlobReader{Storage: blobStorage}
+var blobStorage blobstore.BlobStorage
 
 // Blob request handler
 func blobHandler(w http.ResponseWriter, r *http.Request) {
@@ -24,17 +25,43 @@ func blobHandler(w http.ResponseWriter, r *http.Request) {
 	key := matches[2]
 
 	// Open the blob
-	err := blobFileReder.Open(bid, key)
+	blobFileReader := &blobstore.FileBlobReader{Storage: blobStorage}
+	err := blobFileReader.Open(bid, key)
 	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
+
+	io.Copy(w, blobFileReader)
+}
+
+func initStorage() bool {
+
+	var storagePath string
+	flag.StringVar(&storagePath, "storage", "", "Storage path")
+	flag.StringVar(&storagePath, "s", "", "Storage path")
 	
-	io.Copy( w, &blobFileReder );
+	flag.Parse()
+
+	if storagePath == "" {
+		return false
+	}
+
+	blobStorage = blobstore.NewFileBlobStorage(storagePath)
+	return true
+}
+
+func usage() {
+	fmt.Printf("Ussage: goclient -s <storage path>\n")
 }
 
 // Main function
 func main() {
+
+	if !initStorage() {
+		usage()
+		return
+	}
 
 	http.HandleFunc("/blob/", blobHandler)
 	http.ListenAndServe(":8080", nil)
