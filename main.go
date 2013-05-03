@@ -141,6 +141,31 @@ func handleFile(w http.ResponseWriter, r *http.Request, bid, key string, mime st
 
 var pathPartMatch = regexp.MustCompile(`^/?([^/]+)`)
 
+func serveIndexFile(w http.ResponseWriter, r *http.Request, bid, key, indexFile string) bool {
+
+	dirReader := blobstore.NewDirBlobReader(blobStorage)
+	if dirReader.Open(bid, key) != nil {
+		return false
+	}
+
+	for dirReader.IsNextEntry() {
+		entry, err := dirReader.NextEntry()
+		if err != nil {
+			return false
+		}
+
+		if entry.Name == indexFile {
+			handleFile(
+				w, r,
+				entry.Bid,
+				entry.Key,
+				mime.TypeByExtension(filepath.Ext(indexFile)))
+			return true
+		}
+	}
+	return false
+}
+
 func pathHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Make sure the initial blob has been configured
@@ -153,11 +178,24 @@ func pathHandler(w http.ResponseWriter, r *http.Request) {
 	bid, key := initialBid, initialKey
 	name := ""
 
+	indexFile := "index.html"
+	indexAllowed := true
+
 	for {
 
 		// The path ends with '/' character -
 		// must be interpreted as a directory
 		if path == "/" {
+
+			if serveIndexFile(w, r, bid, key, indexFile) {
+				return
+			}
+
+			if !indexAllowed {
+				http.NotFound(w, r)
+				return
+			}
+
 			if !handleDirectory(w, r, bid, key, true) {
 				http.NotFound(w, r)
 			}
@@ -168,8 +206,8 @@ func pathHandler(w http.ResponseWriter, r *http.Request) {
 
 			// If that's the directory blob, redirect it so that it
 			// contains the trailing '/'
-			if blobstore.NewDirBlobReader(blobStorage).Open(bid,key) == nil {
-				http.Redirect( w, r, r.URL.Path + "/", http.StatusMovedPermanently )
+			if blobstore.NewDirBlobReader(blobStorage).Open(bid, key) == nil {
+				http.Redirect(w, r, r.URL.Path+"/", http.StatusMovedPermanently)
 				return
 			}
 
