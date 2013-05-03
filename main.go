@@ -230,7 +230,7 @@ func initStorage() bool {
 }
 
 func usage() {
-	fmt.Printf("Ussage: goclient -s <storage path>\n")
+	fmt.Println("Ussage: goclient -s <storage path> [-ib BID:KEY]")
 }
 
 // Main function
