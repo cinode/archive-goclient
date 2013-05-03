@@ -171,6 +171,14 @@ func pathHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if path == "" {
+
+			// If that's the directory blob, redirect it so that it
+			// contains the trailing '/'
+			if blobstore.NewDirBlobReader(blobStorage).Open(bid,key) == nil {
+				http.Redirect( w, r, r.URL.Path + "/", http.StatusMovedPermanently )
+				return
+			}
+
 			handleFile(w, r, bid, key,
 				mime.TypeByExtension(filepath.Ext(name)))
 			return
