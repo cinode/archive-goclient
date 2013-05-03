@@ -84,8 +84,14 @@ func handleDirectory(w http.ResponseWriter, r *http.Request, bid, key string, pr
 		}
 
 		if prettyPath {
-			fmt.Fprintf(w, "<a href=\"%s\">%s</a>\n",
+			dirSuffix := ""
+			if entry.MimeType == "application/x-cinode-directory" {
+				dirSuffix = "/"
+			}
+
+			fmt.Fprintf(w, "<a href=\"%s%s\">%s</a>\n",
 				html.EscapeString(entry.Name),
+				dirSuffix,
 				html.EscapeString(entry.Name),
 			)
 		} else {
