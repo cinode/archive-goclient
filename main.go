@@ -25,7 +25,7 @@ func blobHandler(w http.ResponseWriter, r *http.Request) {
 	key := matches[2]
 
 	// Open the blob
-	blobFileReader := &blobstore.FileBlobReader{Storage: blobStorage}
+	blobFileReader := blobstore.NewFileBlobReader(blobStorage)
 	err := blobFileReader.Open(bid, key)
 	if err != nil {
 		http.NotFound(w, r)
