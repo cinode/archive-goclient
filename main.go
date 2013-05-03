@@ -6,7 +6,9 @@ import (
 	"github.com/cinode/golib/blobstore"
 	"html"
 	"io"
+	"mime"
 	"net/http"
+	"path/filepath"
 	"regexp"
 )
 
@@ -58,7 +60,7 @@ func blobHandler(w http.ResponseWriter, r *http.Request) {
 	key := matches[2]
 
 	if !handleDirectory(w, r, bid, key, false) {
-		handleFile(w, r, bid, key)
+		handleFile(w, r, bid, key, "")
 	}
 }
 
@@ -106,7 +108,7 @@ func handleDirectory(w http.ResponseWriter, r *http.Request, bid, key string, pr
 	return true
 }
 
-func handleFile(w http.ResponseWriter, r *http.Request, bid, key string) {
+func handleFile(w http.ResponseWriter, r *http.Request, bid, key string, mime string) {
 	// Open the blob
 	blobFileReader := blobstore.NewFileBlobReader(blobStorage)
 	err := blobFileReader.Open(bid, key)
@@ -116,14 +118,26 @@ func handleFile(w http.ResponseWriter, r *http.Request, bid, key string) {
 	}
 
 	// Read up to 512 first bytes in order to detect the mime type
-	buff := make([]byte, 512)
-	n, err := blobFileReader.Read(buff)
-	buff = buff[:n]
+	if mime == "" {
 
-	contentType := http.DetectContentType(buff)
-	w.Header().Add("Content-type", contentType)
+		buff := make([]byte, 512)
+		n, err := blobFileReader.Read(buff)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		buff = buff[:n]
 
-	w.Write(buff)
+		mime := http.DetectContentType(buff)
+		w.Header().Add("Content-type", mime)
+
+		w.Write(buff)
+
+	} else {
+
+		w.Header().Add("Content-type", mime)
+
+	}
 
 	io.Copy(w, blobFileReader)
 }
@@ -143,6 +157,7 @@ func pathHandler(w http.ResponseWriter, r *http.Request) {
 
 	path := r.URL.Path
 	bid, key := initialBid, initialKey
+	name := ""
 
 	for {
 
@@ -156,7 +171,8 @@ func pathHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if path == "" {
-			handleFile(w, r, bid, key)
+			handleFile(w, r, bid, key,
+				mime.TypeByExtension(filepath.Ext(name)))
 			return
 		}
 
@@ -168,6 +184,7 @@ func pathHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		// Cut off this part of the path
 		path = path[len(matches[0]):]
+		name = matches[1]
 
 		// Search for entry in the current blob dir
 		reader := blobstore.NewDirBlobReader(blobStorage)
@@ -184,7 +201,7 @@ func pathHandler(w http.ResponseWriter, r *http.Request) {
 				http.NotFound(w, r)
 				return
 			}
-			if entry.Name == matches[1] {
+			if entry.Name == name {
 				bid, key, found = entry.Bid, entry.Key, true
 			}
 		}
