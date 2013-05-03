@@ -156,9 +156,7 @@ func pathHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if path == "" {
-			if !handleDirectory(w, r, bid, key, true) {
-				handleFile(w, r, bid, key)
-			}
+			handleFile(w, r, bid, key)
 			return
 		}
 
