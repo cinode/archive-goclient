@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/cinode/golib/blobstore"
+	"html"
 	"io"
 	"net/http"
 	"regexp"
@@ -24,6 +25,42 @@ func blobHandler(w http.ResponseWriter, r *http.Request) {
 	bid := matches[1]
 	key := matches[2]
 
+	if !handleDirectory(w, r, bid, key) {
+		handleFile(w, r, bid, key)
+	}
+}
+
+func handleDirectory(w http.ResponseWriter, r *http.Request, bid, key string) bool {
+
+	// Open the directory
+	reader := blobstore.NewDirBlobReader(blobStorage)
+	err := reader.Open(bid, key)
+	if err != nil {
+		// Let's assume it's a file blob then
+		return false
+	}
+
+	// Prepare html layout
+	fmt.Fprint(w, "<html><head><title>Directory listing</title></head><body><h1>Directory listing:</h1><pre>")
+	defer fmt.Fprint(w, "</pre></body></html>")
+
+	for reader.IsNextEntry() {
+		entry, err := reader.NextEntry()
+		if err != nil {
+			fmt.Fprintf(w, "Error happened: %s", err)
+			break
+		}
+		fmt.Fprintf(w, "<a href=\"/blob/%s/%s\">%s</a>\n",
+			html.EscapeString(entry.Bid),
+			html.EscapeString(entry.Key),
+			html.EscapeString(entry.Name),
+		)
+	}
+
+	return true
+}
+
+func handleFile(w http.ResponseWriter, r *http.Request, bid, key string) {
 	// Open the blob
 	blobFileReader := blobstore.NewFileBlobReader(blobStorage)
 	err := blobFileReader.Open(bid, key)
